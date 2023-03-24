@@ -1,0 +1,3 @@
+# ignore objects and executable file
+*.o
+*.out
