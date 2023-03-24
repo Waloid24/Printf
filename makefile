@@ -6,5 +6,5 @@ c:
 	gcc -c -g main.c -o main.o
 
 clear:
-	rm -rf *.o
+	rm -rf *.o *.out
 
