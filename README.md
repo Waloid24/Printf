@@ -10,7 +10,7 @@ Supports:
 * `%%` - percentage withdrawal
 
 File execution result main.cpp:
-[The result of running the file main.cpp](images/result.png)
+![The result of running the file main.cpp](images/result.png)
 
 I save this sources that I used:
 1) https://chromium.googlesource.com/chromiumos/docs/+/master/constants/syscalls.md#x86_64-64_bit
