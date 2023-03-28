@@ -4,8 +4,11 @@
 ;section .rodata
 
 section .data
-		msg: db "Hel %d \n", 0
+		msg: db "%a", 0
+		name: db "Andrei", 0
 
+	
+		char: db 0h
 
 section .text
 
@@ -17,7 +20,7 @@ section .text
 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 _start:
 		mov rdi, msg
-		mov rsi, -19
+		mov rsi, name
 		call _printf
 
 		mov rax, 0x3C		;exit64(rdi)
@@ -34,50 +37,102 @@ _start:
 ;printf
 ;==========================================================
 ;----------------------------------------------------------
-;
+;The function outputs a string to the console. Supports
+;%d, %c, %s, %o (octal number system), %x, the designations
+;of the specifiers correspond to the standard printf 
+;function
 ;----------------------------------------------------------
-;
-;
+;Arguments:
+;	1) an arbitrary number, placed in accordance with
+;	   the C standard
+;Returns:
+;	1) A string to the console, quoted with ASCII 
+;	   characters
+;Destroys:
+;	1) flags
 ;==========================================================
 _printf:	
+
+		pop r15				; removing return address
+
+		push r9         ; pushing register arguments (6 args)
+        push r8
+        push rcx
+        push rdx
+        push rsi
+        push rdi        ; first argument is format string
+
+		call scanFormat
+
+		pop rdi
+        pop rsi
+        pop rdx
+        pop rcx
+        pop r8
+        pop r9 
+
+		push r15
+		ret
+
+;==========================================================
+;scanFormat
+;==========================================================
+;----------------------------------------------------------
+;service function of the printf function
+;----------------------------------------------------------
+;Arguments:
+;		1) none (works with stack)
+;Returns:
+;	1) A string to the console, quoted with ASCII 
+;	   characters
+;Destroys:
+;	1) rax	4) rbx	7) flags
+;	2) rsi	5) rcx
+;	3) rdi	6) rdx
+;
+;==========================================================
+
+scanFormat:
 		push rbp
-       	mov rbp, rsp
-		push rbx
-		
-		push r9
-		push r8
-		push rcx
-		push rdx
-		push rsi
+       		mov rbp, rsp
 
-		mov r8, rdi			; string
+		add rbp, 16			
+		mov r8, [rbp]		; rdi points to format string 
+		add rbp, 8			; rbp points to first arg
 		dec r8
 
-.aftSpec:
-		xor rdx, rdx		; buffer
-		dec rdx
-	
-.next:		
+.aftSpec:	
 		inc r8
-		inc rdx			; distance between specifiers
-		cmp byte [r8], 0	; end of str
+		xor rdx, rdx
+
+.next:
+		cmp byte [r8], 0
 		je .end
-		cmp byte [r8], 0x25	; 0x25 = %
-		jne .next
+		cmp byte [r8], '%'
+		je .specifier
 		
 		inc r8
+		inc rdx
+		jmp .next		
 
+.specifier:
 		sub r8, rdx
-		dec r8
 		mov rsi, r8
+		mov rdi, 1
 		mov rax, 1
-		mov rdi, rax
 		syscall
-		add r8, rdx
-		inc r8
 
+		add r8, rdx
+		inc r8			; ...%d...
+					;     ^	
 		mov rcx, [r8]
 		and rcx, 127
+		cmp rcx, '%'
+		je .percent
+		cmp rcx, 'b'
+		jl .default
+		cmp rcx, 'x'
+		jg .default
 		sub rcx, 'b'
 
 		jmp [.jumpTable + rcx*8]
@@ -96,95 +151,69 @@ _printf:
 		times 2 dq (.default)
 
 
-.s:		pop rsi
+.s:		mov rsi, [rbp]		; rsi - pointer to string
 		mov rdi, rsi
-		call __strlen		; in rdx - length
+		call _strlen		; in rdx - length
 		mov rdi, 1
 		mov rax, rdi
 		syscall
+		add rbp, 8
 		jmp .aftSpec
 
-.c:		pop rsi
+.c:		mov rax, [rbp]		; get elem in the stack
+		mov rsi, char
+		mov byte [rsi], al
 		mov rdi, 1			; fd = console
 		mov rax, rdi		; write
 		mov rdx, 1			; length word
 		syscall
+		add rbp, 8
 		jmp .aftSpec
 
-.d:		pop rax
+.d:		mov rax, [rbp]		; get elem in the stack
 		call _dec
+		add rbp, 8
 		jmp .aftSpec
 
 .b:		mov rbx, 1
-		pop rax
+		mov rax, [rbp]		; get elem in the stack
 		call _boh
+		add rbp, 8
 		jmp .aftSpec
 
 .o:		mov rbx, 3
-		pop rax
+		mov rax, [rbp]		; get elem in the stack
 		call _boh
+		add rbp, 8
 		jmp .aftSpec
 
 .x:		mov rbx, 4
-		pop rax
+		mov rax, [rbp]		; get elem in the stack
 		call _boh
+		add rbp, 8
 		jmp .aftSpec
 
-.default:	jmp .next			
-		
+.percent:	
+		mov rsi, r8
+		mov rdx, 1
+		mov rdi, 1
+		mov rax, 1
+		syscall
+		jmp .aftSpec		
 
-.end:	mov rsi, r8
+.default:	
+		add rdx, 2
+		inc r8
+		jmp .next
+
+.end:	
+		mov rsi, r8
 		sub rsi, rdx
 		mov rax, 1
 		mov rdi, rax
-		syscall
+		syscall				; print the remaining text
 
-		mov rsp, rbp 
-		sub rsp, 0x8
-		pop rbx
 		pop rbp
-
-
-		ret
-
-;==========================================================
-;strchr
-;==========================================================
-;----------------------------------------------------------
-;The function that looks for the first occurence of
-;a character in a string.
-;----------------------------------------------------------
-;Arguments:
-;	1) rdi (pointer to the string)
-;	2) al  (ascii code of the desired character)
-;Returns:
-;	1) rsi (pointer to the first occurrence of a
-;		 character in a string)
-;	2) zf  (1 if char was found, 0 otherwise)
-;Destroys:
-;	1) FLAGS
-;	2) rsi
-;==========================================================
-
-__strchr:	push rdi 
- 
-		cld
-.next:		
-		cmp byte [rdi], 0
-		je .end
-		scasb			; sets zf=1 if char was found
-		jne .next
-
-		mov rsi, rdi
-		dec rsi	
-		pop rdi
-		ret
-
-.end:		
-		or al, al		; sets zf = 0
-
-		mov rsi, rdi	
-		pop rdi
 		ret
 
 ;==========================================================
@@ -199,18 +228,20 @@ __strchr:	push rdi
 ;	1) rdx (string length)
 ;Destroys:
 ;	1) FLAGS
-;	2)  rdx
+;	2) rdx
+;	3) al
 ;==========================================================
 
-__strlen:	
+_strlen:	
 		push rdi
 
 		xor rdx, rdx
 		mov al, 0
 
 .Next:		
-		scasb
+		cmp [rdi], al
 		je .End
+		inc rdi
 		inc rdx
 		jmp .Next	
 	
@@ -240,7 +271,6 @@ __strlen:
 
 
 section .data
-		mask db 18446744073709551615	; 111111...11111
 		buf db 64 dup(0)	
 
 section .text
@@ -252,14 +282,15 @@ _boh:
 .next:
 		cmp rax, 0
 		je .end
-		mov rsi, 18446744073709551615	; 111111...11111
+		mov rsi, 0xffffffffffffffff	; 111111...11111
 		mov rcx, 64
 		sub rcx, rbx			; how much to shift ->
-		shr rsi, cl				; for exmpl: 000..01111
-								; mask for hex     ^^^^
+		shr rsi, cl			; for exmpl: 000..01111
+						; mask for hex     ^^^^
 		push rax
 		and rax, rsi			; for exmpl: rsi -> 000..01001
-		
+
+		; maybe remove 2 jumps to unconditional add rax, 0x30 + add rax, ???	
 		cmp rax, 9
 		ja .letter
 		add rax, 0x30	
@@ -367,6 +398,8 @@ _dec:
 		mov rax, rdi
 		mov rdx, r8
 		syscall
+		mov al, 0
+		mov [sign], al
 		pop r8
 		ret
 
