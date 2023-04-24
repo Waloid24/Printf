@@ -21,7 +21,7 @@ make printf
 ```
 
 File execution result main.cpp:
-[The result of running the file main.cpp](images/result.png)
+<img src = "images/For git.png">
 
 ## C+Asm
 
