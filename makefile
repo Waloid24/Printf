@@ -1,18 +1,25 @@
+#======================My Printf=========================
+
 printf : printf.o main.o
-	gcc -no-pie main.o printf.o -o printf
+	@ gcc -no-pie main.o printf.o -o printf
+	@ ./printf
 
 printf.o : printf.asm
-	nasm -f elf64 printf.asm -o printf.o
+	@ nasm -f elf64 printf.asm -o printf.o
 
 main.o : main.cpp
-	gcc -c main.cpp -o main.o
+	@ g++ -c main.cpp -o main.o
 
 
-debug:
-	nasm -f elf64 -DDEBUG printf.asm -o printf.o
-	ld printf.o -o printf
-	./printf
+#========================C + ASM=========================
+# prcasm : casm.o main.o
+prcasm : casm.o 
+	g++ -no-pie casm.o -o casm
+	./casm
+
+casm.o:
+	nasm -f elf64 c+asm.asm -o casm.o
+#========================================================
 
 clear:
 	rm -rf *.o *.out
-

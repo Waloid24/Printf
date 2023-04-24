@@ -1,4 +1,4 @@
-// #include <stdio.h>
+#include <stdio.h>
 extern "C" void _printf (const char * str, ...);
 
 int main (void)
@@ -10,6 +10,7 @@ int main (void)
 	_printf ("");
 	_printf ("%b", 20);
 	_printf ("%a\n");
+	_printf  ("%%\n");
 	return 0;
 	
 }
